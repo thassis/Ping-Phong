@@ -9,9 +9,15 @@
 typedef struct ponto {
     float x, y;
 } Ponto;
+
+//errorLarguraImagem: é a tentativa de dizer o tamanho da imagem com espaços em branco
 typedef struct tamanho {
     float largura, altura;
 } Tamanho;
+
+typedef struct velocidade {
+    float x, y;
+} Velocidade;
 
 Ponto posicaoBola;
 Tamanho tamanhoBola;
@@ -24,8 +30,8 @@ Tamanho tamanhoBarraDireita;
 
 Ponto posicaoMouse;
 
-int velocidadeBola = 10;
-int velocidadeBarra = 30;
+Velocidade velocidadeBola;
+Velocidade velocidadeBarra;
 const int comprimentoMaximoTela = 900;
 const int larguraMaximaTela = 450;
 
@@ -58,13 +64,6 @@ int checaColisaoComBola(Ponto posicaoObj1, Tamanho tamanhoObj1, Ponto posicaoObj
         posicaoObj2.y + tamanhoObj2.altura >= posicaoObj1.y;
     // Collision only if on both axes
     return collisionX && collisionY;
-}
-
-int checaColisaoComExtremidadeVertical(Ponto posicaoObj1, Tamanho tamanhoObj1){
-    int collisionY = posicaoObj1.y + tamanhoObj1.altura/2 >= larguraMaximaTela + velocidadeBola
-        && posicaoObj1.y + tamanhoObj1.altura/2 >= larguraMaximaTela + velocidadeBola;
-    // Collision only if on both axes
-    return collisionY;
 }
 
 GLuint carregaTextura(const char* arquivo) {
@@ -189,21 +188,37 @@ void desenhaCena() {
 }
 
 void iniciaObjetos(){
-    tamanhoBarraDireita.largura = 50;
-    tamanhoBarraDireita.altura = 50;
+
+    tamanhoBola.largura = 75;
+    tamanhoBola.altura = 75;
+
+    float posicaoVerticalBola = rand()%larguraMaximaTela;
+
+    if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
+        posicaoVerticalBola += tamanhoBola.altura+5;
+    else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
+        printf("%f",(float) tamanhoBola.altura);
+        posicaoVerticalBola = larguraMaximaTela-tamanhoBola.altura-5;
+    }
+
+    tamanhoBarraDireita.largura = 15;
+    tamanhoBarraDireita.altura = 100;
     posicaoBarraDireita.x = (comprimentoMaximoTela-tamanhoBarraDireita.largura);
     posicaoBarraDireita.y = (larguraMaximaTela-tamanhoBarraDireita.altura)/2;
 
-    tamanhoBarraEsquerda.largura = 50;
-    tamanhoBarraEsquerda.altura = 50;
+    tamanhoBarraEsquerda.largura = 15;
+    tamanhoBarraEsquerda.altura = 100;
     posicaoBarraEsquerda.x = 0;
     posicaoBarraEsquerda.y = (larguraMaximaTela-tamanhoBarraEsquerda.altura)/2;
 
     posicaoBola.x = comprimentoMaximoTela/2;
-    posicaoBola.y = rand()%larguraMaximaTela;
-    tamanhoBola.largura = 75;
-    tamanhoBola.altura = 75;
+    posicaoBola.y = posicaoVerticalBola;
 
+    velocidadeBola.x = 10;
+    velocidadeBola.y = 20;
+
+    velocidadeBarra.y = 40;
+    velocidadeBarra.x = 0;
     orientacaoVerticalBola = 1;
     orientacaoHorizontalBola = -1;
 
@@ -325,33 +340,42 @@ void atualizaCena(int periodo) {
         }  
 
         if(posicaoBola.x >= comprimentoMaximoTela || posicaoBola.x <= 0){
+            float posicaoVerticalBola = rand()%larguraMaximaTela;
+
+            if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
+                posicaoVerticalBola += tamanhoBola.altura+5;
+            else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
+                printf("%f",(float) tamanhoBola.altura);
+                posicaoVerticalBola = larguraMaximaTela-tamanhoBola.altura-5;
+            }
+
             posicaoBola.x = comprimentoMaximoTela/2;
-            posicaoBola.y = rand()%larguraMaximaTela; 
+            posicaoBola.y = posicaoVerticalBola; 
             podeColidirDireita = 1;
             podeColidirEsquerda = 1;
         }
 
-        posicaoBola.x += orientacaoHorizontalBola*velocidadeBola;
-        posicaoBola.y += orientacaoVerticalBola*5;
+        posicaoBola.x += orientacaoHorizontalBola*velocidadeBola.x;
+        posicaoBola.y += orientacaoVerticalBola*velocidadeBola.y;
 
         if(keyboard['w'] == 1){
-            posicaoBarraEsquerda.y -= velocidadeBarra;
+            posicaoBarraEsquerda.y -= velocidadeBarra.y;
             if(verificaSePassouVertical(posicaoBarraEsquerda, tamanhoBarraEsquerda) == 1)
                 posicaoBarraEsquerda.y = 0;
         }
         if(keyboard['s'] == 1){
-            posicaoBarraEsquerda.y += velocidadeBarra;
+            posicaoBarraEsquerda.y += velocidadeBarra.y;
             if(verificaSePassouVertical(posicaoBarraEsquerda, tamanhoBarraEsquerda) == 1)
                 posicaoBarraEsquerda.y = larguraMaximaTela - tamanhoBarraEsquerda.altura;
         }
 
         if(keyboard['o'] == 1){
-            posicaoBarraDireita.y -= velocidadeBarra;
+            posicaoBarraDireita.y -= velocidadeBarra.y;
             if(verificaSePassouVertical(posicaoBarraDireita, tamanhoBarraDireita) == 1)
                 posicaoBarraDireita.y = 0;
         }
         if(keyboard['l'] == 1){
-            posicaoBarraDireita.y += velocidadeBarra;
+            posicaoBarraDireita.y += velocidadeBarra.y;
             if(verificaSePassouVertical(posicaoBarraDireita, tamanhoBarraDireita) == 1)
                 posicaoBarraDireita.y = larguraMaximaTela - tamanhoBarraDireita.altura;
         }
