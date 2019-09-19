@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 typedef struct ponto {
     float x, y;
@@ -23,10 +24,10 @@ Tamanho tamanhoBarraDireita;
 
 Ponto posicaoMouse;
 
-int velocidadeBola = 20;
+int velocidadeBola = 10;
 int velocidadeBarra = 30;
 const int comprimentoMaximoTela = 900;
-const int larguraMaximaTela = 500;
+const int larguraMaximaTela = 450;
 
 int orientacaoVerticalBola = 1;
 int orientacaoHorizontalBola = -1;
@@ -39,9 +40,14 @@ int keyboard[256];
 int jogoPausado = 0;
 int reiniciarJogo = 0;
 
-GLuint idTexturaBola;
+int quadroAtualBola = 1;
+
+float teste = 0.05;
+GLuint idTexturaBolaBranca;
+GLuint idTexturaBolaPreta;
 GLuint idTexturaBarraEsquerda;
 GLuint idTexturaBarraDireita;
+GLuint idYinYang;
 
 int checaColisaoComBola(Ponto posicaoObj1, Tamanho tamanhoObj1, Ponto posicaoObj2, Tamanho tamanhoObj2){
      // Collision x-axis
@@ -76,64 +82,102 @@ GLuint carregaTextura(const char* arquivo) {
     return idTextura;
 }
 
+void desenhaBola(){
+    GLuint idTexturaBola = idTexturaBolaBranca;
+    
+    if(posicaoBola.x + tamanhoBola.largura >= comprimentoMaximoTela/2) idTexturaBola = idTexturaBolaPreta;
+    
+    glBindTexture(GL_TEXTURE_2D, idTexturaBola);
+    glEnable(GL_PRIMITIVE_RESTART);
+    glBegin(GL_POLYGON);
+        // Associamos um canto da textura para cada vértice
+        glTexCoord2f((float) (quadroAtualBola)/19, 0);
+        glVertex2f(posicaoBola.x, posicaoBola.y);
+
+        glTexCoord2f((float) (quadroAtualBola+1)/19, 0);
+        glVertex2f(posicaoBola.x + tamanhoBola.largura, posicaoBola.y);
+
+        glTexCoord2f((float) (quadroAtualBola+1)/19, 1);
+        glVertex2f(posicaoBola.x + tamanhoBola.largura, posicaoBola.y + tamanhoBola.altura);
+
+        glTexCoord2f((float) (quadroAtualBola)/19, 1);
+        glVertex2f(posicaoBola.x, posicaoBola.y + tamanhoBola.altura);
+
+    glEnd();
+}
+
 void desenhaCena() {
     // Limpa a tela (com a cor definida por glClearColor(r,g,b)) para que
     // possamos desenhar
     glClear(GL_COLOR_BUFFER_BIT);
-    glColor3f(1.0f, 0.0f, 0.0f);
+    glColor3f(0.0f, 0.0f, 0.0f);
     // Habilita o uso de texturas
-    // glEnable(GL_TEXTURE_2D);
-    // Começa a usar a textura que criamos
-    // glBindTexture(GL_TEXTURE_2D, idTexturaBola);
-    glBegin(GL_POLYGON);
-        // Associamos um canto da textura para cada vértice
-       // glTexCoord2f(0, 0);
-        glVertex2f(posicaoBola.x, posicaoBola.y);
+    glBegin(GL_TRIANGLE_STRIP);
+        glVertex2f(0, 0);
 
-       // glTexCoord2f(1, 0);
-        glVertex2f( posicaoBola.x + tamanhoBola.largura, posicaoBola.y);
+        glVertex2f(comprimentoMaximoTela/2, 0);
 
-       // glTexCoord2f(1, 1);
-        glVertex2f( posicaoBola.x + tamanhoBola.largura, posicaoBola.y + tamanhoBola.altura);
+        glVertex2f(0, larguraMaximaTela);
 
-       // glTexCoord2f(0, 1);
-        glVertex2f(posicaoBola.x, posicaoBola.y + tamanhoBola.altura);
+        glVertex2f(comprimentoMaximoTela/2, larguraMaximaTela);
 
     glEnd();
-    
-    // Começa a usar a textura que criamos
-    // glBindTexture(GL_TEXTURE_2D, idTexturaBarraDireita);
-    // glEnable(GL_PRIMITIVE_RESTART);
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, idYinYang);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glEnable(GL_PRIMITIVE_RESTART);
     glBegin(GL_POLYGON);
         // Associamos um canto da textura para cada vértice
-       // glTexCoord2f(0, 0);
+        glTexCoord2f(0, 0);
+        glVertex2f((comprimentoMaximoTela/2) - 0.10*comprimentoMaximoTela, (comprimentoMaximoTela/4) - 0.10*comprimentoMaximoTela);
+
+        glTexCoord2f(1, 0);
+        glVertex2f((comprimentoMaximoTela/2) + 0.10*comprimentoMaximoTela, (comprimentoMaximoTela/4) - 0.10*comprimentoMaximoTela);
+
+        glTexCoord2f(1, 1);
+        glVertex2f((comprimentoMaximoTela/2) + 0.10*comprimentoMaximoTela, (comprimentoMaximoTela/4) + 0.10*comprimentoMaximoTela);
+
+        glTexCoord2f(0, 1);
+        glVertex2f((comprimentoMaximoTela/2) - 0.10*comprimentoMaximoTela, (comprimentoMaximoTela/4) + 0.10*comprimentoMaximoTela);
+
+    glEnd();
+
+    desenhaBola();
+
+    // Começa a usar a textura que criamos
+    glBindTexture(GL_TEXTURE_2D, idTexturaBarraDireita);
+    glEnable(GL_PRIMITIVE_RESTART);
+    glBegin(GL_POLYGON);
+        // Associamos um canto da textura para cada vértice
+        glTexCoord2f(0, 0);
         glVertex2f(posicaoBarraDireita.x, posicaoBarraDireita.y);
 
-       // glTexCoord2f(1, 0);
+        glTexCoord2f(1, 0);
         glVertex2f( posicaoBarraDireita.x + tamanhoBarraDireita.largura, posicaoBarraDireita.y);
 
-       // glTexCoord2f(1, 1);
+        glTexCoord2f(1, 1);
         glVertex2f( posicaoBarraDireita.x + tamanhoBarraDireita.largura, posicaoBarraDireita.y + tamanhoBarraDireita.altura);
 
-       // glTexCoord2f(0, 1);
+        glTexCoord2f(0, 1);
         glVertex2f(posicaoBarraDireita.x, posicaoBarraDireita.y + tamanhoBarraDireita.altura);
 
     glEnd();
 
-    // glBindTexture(GL_TEXTURE_2D, idTexturaBarraEsquerda);    
-    // glEnable(GL_PRIMITIVE_RESTART);
+    glBindTexture(GL_TEXTURE_2D, idTexturaBarraEsquerda);    
+    glEnable(GL_PRIMITIVE_RESTART);
     glBegin(GL_POLYGON);
         // Associamos um canto da textura para cada vértice
-       // glTexCoord2f(0, 0);
+        glTexCoord2f(0, 0);
         glVertex2f(posicaoBarraEsquerda.x, posicaoBarraEsquerda.y);
 
-       // glTexCoord2f(1, 0);
+        glTexCoord2f(1, 0);
         glVertex2f( posicaoBarraEsquerda.x + tamanhoBarraEsquerda.largura, posicaoBarraEsquerda.y);
 
-       // glTexCoord2f(1, 1);
+        glTexCoord2f(1, 1);
         glVertex2f( posicaoBarraEsquerda.x + tamanhoBarraEsquerda.largura, posicaoBarraEsquerda.y + tamanhoBarraEsquerda.altura);
 
-       // glTexCoord2f(0, 1);
+        glTexCoord2f(0, 1);
         glVertex2f(posicaoBarraEsquerda.x, posicaoBarraEsquerda.y + tamanhoBarraEsquerda.altura);
 
     glEnd();
@@ -157,8 +201,8 @@ void iniciaObjetos(){
 
     posicaoBola.x = comprimentoMaximoTela/2;
     posicaoBola.y = rand()%larguraMaximaTela;
-    tamanhoBola.largura = 50;
-    tamanhoBola.altura = 50;
+    tamanhoBola.largura = 75;
+    tamanhoBola.altura = 75;
 
     orientacaoVerticalBola = 1;
     orientacaoHorizontalBola = -1;
@@ -167,7 +211,7 @@ void iniciaObjetos(){
     podeColidirEsquerda = 1;
 
     jogoPausado = 0;
-    
+
     for(int i=0;i<256;i++)
         keyboard[i] = 0;
 }
@@ -183,10 +227,11 @@ void inicializa() {
     glEnable(GL_BLEND );
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    idTexturaBola = carregaTextura("bola.png");
+    idTexturaBolaBranca = carregaTextura("bola_branca.png");
+    idTexturaBolaPreta = carregaTextura("bola_preta.png");
     idTexturaBarraEsquerda = carregaTextura("barraEsquerda.png");
     idTexturaBarraDireita = carregaTextura("barraDireita.png");
-
+    idYinYang = carregaTextura("yinyang.png");
     // define o quadrado
     iniciaObjetos();
 }
@@ -254,6 +299,25 @@ int verificaSePassouVertical(Ponto posicao, Tamanho tamanho){
 
 // Callback do evento timer
 void atualizaCena(int periodo) {
+    if(orientacaoHorizontalBola == 1){
+        quadroAtualBola++;
+        if(quadroAtualBola < 19){
+            desenhaBola();
+        } else{
+            quadroAtualBola = 0;
+            desenhaBola();
+        }
+    } else {
+        quadroAtualBola--;
+        if(quadroAtualBola > 0){
+            desenhaBola();
+        } else{
+            quadroAtualBola = 18;
+            desenhaBola();
+        }
+    }
+    
+
     // faz o quadrado andar na direção do ponteiro
     if(jogoPausado == 0){
         if(verificaSePassouVertical(posicaoBola, tamanhoBola) == 1){
