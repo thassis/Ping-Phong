@@ -19,6 +19,12 @@ typedef struct velocidade {
     float x, y;
 } Velocidade;
 
+typedef struct pontuacao{
+    int jogador1, jogador2;
+} Pontuacao;
+
+Pontuacao placar;
+
 Ponto posicaoBola;
 Tamanho tamanhoBola;
 
@@ -32,8 +38,9 @@ Ponto posicaoMouse;
 
 Velocidade velocidadeBola;
 Velocidade velocidadeBarra;
-const int comprimentoMaximoTela = 900;
-const int larguraMaximaTela = 450;
+
+const int comprimentoMaximoTela = 600;
+const int larguraMaximaTela = 300;
 
 int orientacaoVerticalBola = 1;
 int orientacaoHorizontalBola = -1;
@@ -46,22 +53,24 @@ int keyboard[256];
 int jogoPausado = 0;
 int reiniciarJogo = 0;
 
-int quadroAtualBola = 1;
+int quadroAtualBola = 0;
+int quadroAtualExplosaoColisao = 0;
 
-float teste = 0.05;
+int bolaColidiuBarra = 0;
+
 GLuint idTexturaBolaBranca;
 GLuint idTexturaBolaPreta;
 GLuint idTexturaBarraEsquerda;
 GLuint idTexturaBarraDireita;
 GLuint idYinYang;
 
-int checaColisaoComBola(Ponto posicaoObj1, Tamanho tamanhoObj1, Ponto posicaoObj2, Tamanho tamanhoObj2){
-     // Collision x-axis
-    int collisionX = posicaoObj1.x + tamanhoObj1.largura >= posicaoObj2.x &&
-        posicaoObj2.x + tamanhoObj2.largura >= posicaoObj1.x;
+int checaColisaoComBola(Ponto posicaoObj1, Tamanho tamanhoObj1){
+    // Collision x-axis
+    int collisionX = posicaoObj1.x + tamanhoObj1.largura >= posicaoBola.x &&
+        posicaoBola.x + tamanhoBola.largura >= posicaoObj1.x;
     // Collision y-axis
-    int collisionY = posicaoObj1.y + tamanhoObj1.altura >= posicaoObj2.y &&
-        posicaoObj2.y + tamanhoObj2.altura >= posicaoObj1.y;
+    int collisionY = posicaoObj1.y + tamanhoObj1.altura >= posicaoBola.y &&
+        posicaoBola.y + tamanhoBola.altura >= posicaoObj1.y;
     // Collision only if on both axes
     return collisionX && collisionY;
 }
@@ -105,9 +114,39 @@ void desenhaBola(){
     glEnd();
 }
 
+char* retornaPontuacaoString(int pontuacao){
+    char *pontuacaoString;
+    pontuacaoString = (char*)malloc(2*sizeof(char));
+    if(pontuacao < 10){
+        // sprintf(pontuacaoString[0], "%d", 0);
+        
+    } else {
+        sprintf(pontuacaoString, "%d", pontuacao);
+    }
+    return pontuacaoString;
+}
+
+void desenhaPlacar(){
+    char pontuacaoString[2];
+    sprintf(pontuacaoString, "%d", placar.jogador1);
+    glColor3d(1.0, 1.0, 1.0);
+    glRasterPos2d(comprimentoMaximoTela*0.20, (float)larguraMaximaTela*0.1);
+    for (int n=0; n<2; ++n) {
+        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pontuacaoString[n]);
+    }
+    sprintf(pontuacaoString, "%d", placar.jogador2);
+    glColor3d(0.0, 0.0, 0.0);
+    glRasterPos2d(comprimentoMaximoTela*0.70, (float)larguraMaximaTela*0.1);
+    for (int n=0; n<2; ++n) {
+        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pontuacaoString[n]);
+    }
+}
+
 void desenhaCena() {
     // Limpa a tela (com a cor definida por glClearColor(r,g,b)) para que
     // possamos desenhar
+    
+    glutBitmapString(GLUT_BITMAP_HELVETICA_18, "text");
     glClear(GL_COLOR_BUFFER_BIT);
     glColor3f(0.0f, 0.0f, 0.0f);
     // Habilita o uso de texturas
@@ -143,7 +182,6 @@ void desenhaCena() {
     glEnd();
 
     desenhaBola();
-
     // Começa a usar a textura que criamos
     glBindTexture(GL_TEXTURE_2D, idTexturaBarraDireita);
     glEnable(GL_PRIMITIVE_RESTART);
@@ -182,6 +220,8 @@ void desenhaCena() {
     glEnd();
 
     glDisable(GL_TEXTURE_2D);
+    
+    desenhaPlacar();
 
     // Diz ao OpenGL para colocar o que desenhamos na tela
     glutSwapBuffers();
@@ -189,8 +229,8 @@ void desenhaCena() {
 
 void iniciaObjetos(){
 
-    tamanhoBola.largura = 75;
-    tamanhoBola.altura = 75;
+    tamanhoBola.largura = 60;
+    tamanhoBola.altura = 60;
 
     float posicaoVerticalBola = rand()%larguraMaximaTela;
 
@@ -214,10 +254,10 @@ void iniciaObjetos(){
     posicaoBola.x = comprimentoMaximoTela/2;
     posicaoBola.y = posicaoVerticalBola;
 
-    velocidadeBola.x = 10;
+    velocidadeBola.x = 15;
     velocidadeBola.y = 20;
 
-    velocidadeBarra.y = 40;
+    velocidadeBarra.y = 60;
     velocidadeBarra.x = 0;
     orientacaoVerticalBola = 1;
     orientacaoHorizontalBola = -1;
@@ -225,6 +265,8 @@ void iniciaObjetos(){
     podeColidirDireita = 1;
     podeColidirEsquerda = 1;
 
+    placar.jogador1 = 0;
+    placar.jogador2 = 0;
     jogoPausado = 0;
 
     for(int i=0;i<256;i++)
@@ -312,23 +354,45 @@ int verificaSePassouVertical(Ponto posicao, Tamanho tamanho){
     return 0;
 }
 
+float novaPosicaoVerticalBola(){
+    float posicaoVerticalBola = rand()%larguraMaximaTela;
+
+    if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
+        posicaoVerticalBola += tamanhoBola.altura+5;
+    else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
+        posicaoVerticalBola = larguraMaximaTela-tamanhoBola.altura-5;
+    }
+    return posicaoVerticalBola;
+}
+
+//recebe como parametro o jogador que venceu a rodada;
+void atualizaVencedor(int numeroJogador){
+    posicaoBola.x = comprimentoMaximoTela/2;
+    posicaoBola.y = novaPosicaoVerticalBola(); 
+    podeColidirDireita = 1;
+    podeColidirEsquerda = 1;
+    if(numeroJogador == 1) placar.jogador1++;
+    else placar.jogador2++;
+}
+
 // Callback do evento timer
 void atualizaCena(int periodo) {
+    quadroAtualExplosaoColisao++;
+
+    if(quadroAtualExplosaoColisao == 49){ 
+        quadroAtualExplosaoColisao = 0;
+        bolaColidiuBarra = 0;
+    }
+
     if(orientacaoHorizontalBola == 1){
         quadroAtualBola++;
-        if(quadroAtualBola < 19){
-            desenhaBola();
-        } else{
+        if(quadroAtualBola >= 19){
             quadroAtualBola = 0;
-            desenhaBola();
         }
     } else {
         quadroAtualBola--;
-        if(quadroAtualBola > 0){
-            desenhaBola();
-        } else{
+        if(quadroAtualBola <= 0){
             quadroAtualBola = 18;
-            desenhaBola();
         }
     }
     
@@ -339,20 +403,10 @@ void atualizaCena(int periodo) {
             orientacaoVerticalBola *= -1;
         }  
 
-        if(posicaoBola.x >= comprimentoMaximoTela || posicaoBola.x <= 0){
-            float posicaoVerticalBola = rand()%larguraMaximaTela;
-
-            if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
-                posicaoVerticalBola += tamanhoBola.altura+5;
-            else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
-                printf("%f",(float) tamanhoBola.altura);
-                posicaoVerticalBola = larguraMaximaTela-tamanhoBola.altura-5;
-            }
-
-            posicaoBola.x = comprimentoMaximoTela/2;
-            posicaoBola.y = posicaoVerticalBola; 
-            podeColidirDireita = 1;
-            podeColidirEsquerda = 1;
+        if(posicaoBola.x >= comprimentoMaximoTela){
+            atualizaVencedor(1);
+        } else if(posicaoBola.x <= 0){
+            atualizaVencedor(2);
         }
 
         posicaoBola.x += orientacaoHorizontalBola*velocidadeBola.x;
@@ -380,14 +434,14 @@ void atualizaCena(int periodo) {
                 posicaoBarraDireita.y = larguraMaximaTela - tamanhoBarraDireita.altura;
         }
 
-        int colisaoBarraDireitaBola = checaColisaoComBola(posicaoBarraDireita, tamanhoBarraDireita, posicaoBola, tamanhoBola);
+        int colisaoBarraDireitaBola = checaColisaoComBola(posicaoBarraDireita, tamanhoBarraDireita);
 
         if(colisaoBarraDireitaBola == 1 && podeColidirDireita == 1){
             orientacaoHorizontalBola *= -1;
             podeColidirDireita = -1;
             podeColidirEsquerda = 1;
         } else {
-            int colisaoBarraEsquerdaBola = checaColisaoComBola(posicaoBarraEsquerda, tamanhoBarraEsquerda, posicaoBola, tamanhoBola);
+            int colisaoBarraEsquerdaBola = checaColisaoComBola(posicaoBarraEsquerda, tamanhoBarraEsquerda);
             if(colisaoBarraEsquerdaBola == 1 && podeColidirEsquerda == 1){
                 orientacaoHorizontalBola *= -1; 
                 podeColidirEsquerda = -1;
