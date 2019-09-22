@@ -20,10 +20,10 @@ typedef struct velocidade {
 } Velocidade;
 
 typedef struct pontuacao{
-    int jogador1, jogador2;
+    int pontosSet, quantidadeSetsGanho, pontosConsecutivos;
 } Pontuacao;
 
-Pontuacao placar;
+Pontuacao primeiroJogador, segundoJogador;
 
 Ponto posicaoBola;
 Tamanho tamanhoBola;
@@ -54,15 +54,22 @@ int jogoPausado = 0;
 int reiniciarJogo = 0;
 
 int quadroAtualBola = 0;
-int quadroAtualExplosaoColisao = 0;
+int quadroAtualCoroa = 0;
 
 int bolaColidiuBarra = 0;
+
+int verificarGanhadorSetConsecutivos = 0;
+
+int limiteSetsGanharJogo = 3; //números impar
+int quantidadePontosGanharSet = 11;
 
 GLuint idTexturaBolaBranca;
 GLuint idTexturaBolaPreta;
 GLuint idTexturaBarraEsquerda;
 GLuint idTexturaBarraDireita;
 GLuint idYinYang;
+GLuint idImagePause;
+GLuint idTexturaCoroa;
 
 int checaColisaoComBola(Ponto posicaoObj1, Tamanho tamanhoObj1){
     // Collision x-axis
@@ -88,6 +95,59 @@ GLuint carregaTextura(const char* arquivo) {
     }
 
     return idTextura;
+}
+
+void iniciaObjetos(){
+
+    tamanhoBola.largura = 60;
+    tamanhoBola.altura = 60;
+
+    float posicaoVerticalBola = rand()%larguraMaximaTela;
+
+    if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
+        posicaoVerticalBola += tamanhoBola.altura+5;
+    else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
+        printf("%f",(float) tamanhoBola.altura);
+        posicaoVerticalBola = larguraMaximaTela-tamanhoBola.altura-5;
+    }
+
+    tamanhoBarraDireita.largura = 15;
+    tamanhoBarraDireita.altura = 40;
+    posicaoBarraDireita.x = (comprimentoMaximoTela-tamanhoBarraDireita.largura);
+    posicaoBarraDireita.y = (larguraMaximaTela-tamanhoBarraDireita.altura)/2;
+
+    tamanhoBarraEsquerda.largura = 15;
+    tamanhoBarraEsquerda.altura = 40;
+    posicaoBarraEsquerda.x = 0;
+    posicaoBarraEsquerda.y = (larguraMaximaTela-tamanhoBarraEsquerda.altura)/2;
+
+    posicaoBola.x = comprimentoMaximoTela/2;
+    posicaoBola.y = posicaoVerticalBola;
+
+    velocidadeBola.x = 15;
+    velocidadeBola.y = 20;
+
+    velocidadeBarra.y = 60;
+    velocidadeBarra.x = 0;
+    orientacaoVerticalBola = 1;
+    orientacaoHorizontalBola = -1;
+
+    podeColidirDireita = 1;
+    podeColidirEsquerda = 1;
+
+    primeiroJogador.pontosSet = 0;
+    segundoJogador.pontosSet = 0;
+    
+    primeiroJogador.quantidadeSetsGanho = 0;
+    segundoJogador.quantidadeSetsGanho = 0;
+    
+    primeiroJogador.pontosConsecutivos = 0;
+    segundoJogador.pontosConsecutivos = 0;
+
+    jogoPausado = 0;
+
+    for(int i=0;i<256;i++)
+        keyboard[i] = 0;
 }
 
 void desenhaBola(){
@@ -128,13 +188,13 @@ char* retornaPontuacaoString(int pontuacao){
 
 void desenhaPlacar(){
     char pontuacaoString[2];
-    sprintf(pontuacaoString, "%d", placar.jogador1);
+    sprintf(pontuacaoString, "%d", primeiroJogador.pontosSet);
     glColor3d(1.0, 1.0, 1.0);
     glRasterPos2d(comprimentoMaximoTela*0.20, (float)larguraMaximaTela*0.1);
     for (int n=0; n<2; ++n) {
         glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pontuacaoString[n]);
     }
-    sprintf(pontuacaoString, "%d", placar.jogador2);
+    sprintf(pontuacaoString, "%d", segundoJogador.pontosSet);
     glColor3d(0.0, 0.0, 0.0);
     glRasterPos2d(comprimentoMaximoTela*0.70, (float)larguraMaximaTela*0.1);
     for (int n=0; n<2; ++n) {
@@ -142,14 +202,9 @@ void desenhaPlacar(){
     }
 }
 
-void desenhaCena() {
-    // Limpa a tela (com a cor definida por glClearColor(r,g,b)) para que
-    // possamos desenhar
-    
-    glutBitmapString(GLUT_BITMAP_HELVETICA_18, "text");
-    glClear(GL_COLOR_BUFFER_BIT);
-    glColor3f(0.0f, 0.0f, 0.0f);
-    // Habilita o uso de texturas
+
+void desenhaBackgroundPreto(){
+    glColor3d(0.0, 0.0, 0.0);
     glBegin(GL_TRIANGLE_STRIP);
         glVertex2f(0, 0);
 
@@ -160,6 +215,167 @@ void desenhaCena() {
         glVertex2f(comprimentoMaximoTela/2, larguraMaximaTela);
 
     glEnd();
+}
+
+void verificaGanhadorGame(){
+    if(primeiroJogador.quantidadeSetsGanho == limiteSetsGanharJogo){
+        //ganhou
+        iniciaObjetos();
+    } else if(segundoJogador.quantidadeSetsGanho == limiteSetsGanharJogo){
+        //ganhou
+        iniciaObjetos();
+    }
+}
+
+void atualizaSet(){
+    verificarGanhadorSetConsecutivos = 0;
+    primeiroJogador.pontosSet = 0;
+    primeiroJogador.pontosConsecutivos = 0;
+    segundoJogador.pontosSet = 0;
+    segundoJogador.pontosConsecutivos = 0;
+    verificaGanhadorGame();
+}
+
+float novaPosicaoVerticalBola(){
+    float posicaoVerticalBola = rand()%larguraMaximaTela;
+
+    if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
+        posicaoVerticalBola += tamanhoBola.altura+5;
+    else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
+        posicaoVerticalBola = larguraMaximaTela-tamanhoBola.altura-5;
+    }
+    return posicaoVerticalBola;
+}
+
+void verificaGanhadorSet(){
+    if(verificarGanhadorSetConsecutivos == 1){
+        if(primeiroJogador.pontosConsecutivos == 2 ){
+            primeiroJogador.quantidadeSetsGanho++;
+            atualizaSet();
+        } else if(segundoJogador.pontosConsecutivos == 2){
+            segundoJogador.quantidadeSetsGanho++;
+            atualizaSet();
+        }
+    } else if(primeiroJogador.pontosSet == quantidadePontosGanharSet-1 && segundoJogador.pontosSet == quantidadePontosGanharSet-1){
+        primeiroJogador.pontosConsecutivos = 0;
+        segundoJogador.pontosConsecutivos = 0;
+        verificarGanhadorSetConsecutivos = 1;
+    } else {
+        if(primeiroJogador.pontosSet == quantidadePontosGanharSet){
+            primeiroJogador.quantidadeSetsGanho++;
+            atualizaSet();
+        } else if (segundoJogador.pontosSet == quantidadePontosGanharSet){
+            segundoJogador.quantidadeSetsGanho++;
+            atualizaSet();
+        }
+    }
+}
+
+//recebe como parametro o jogador que venceu a rodada;
+void atualizaVencedorSet(int numeroJogador){
+    posicaoBola.x = comprimentoMaximoTela/2;
+    posicaoBola.y = novaPosicaoVerticalBola(); 
+    podeColidirDireita = 1;
+    podeColidirEsquerda = 1;
+    if(numeroJogador == 1){
+        primeiroJogador.pontosSet++;
+        primeiroJogador.pontosConsecutivos++;
+        segundoJogador.pontosConsecutivos = 0;
+    }
+    else{ 
+        segundoJogador.pontosSet++;
+        segundoJogador.pontosConsecutivos++;
+        primeiroJogador.pontosConsecutivos = 0;
+    }
+    verificaGanhadorSet();
+}
+
+void desenhaQuadroAviso(){
+    if(jogoPausado){
+        glColor3d(0.50f, 0.50f, 0.50f);
+        glBegin(GL_TRIANGLE_STRIP);
+            glVertex2f(0, 0);
+
+            glVertex2f(comprimentoMaximoTela, 0);
+
+            glVertex2f(0, larguraMaximaTela);
+
+            glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
+
+        glEnd();
+    }
+}
+
+void desenhaCoroa(Ponto posicaoCoroa, Tamanho tamanhoCoroa){
+    glColor3f(1.0, 1.0, 1.0);
+    glBindTexture(GL_TEXTURE_2D, idTexturaCoroa);
+    glEnable(GL_PRIMITIVE_RESTART);
+    glBegin(GL_POLYGON);
+        // Associamos um canto da textura para cada vértice
+        glTexCoord2f((float) (quadroAtualCoroa)/7, 0);
+        glVertex2f(posicaoCoroa.x, posicaoCoroa.y + tamanhoCoroa.altura);
+
+        glTexCoord2f((float) (quadroAtualCoroa+1)/7, 0);
+        glVertex2f(posicaoCoroa.x + tamanhoCoroa.largura, posicaoCoroa.y + tamanhoCoroa.altura);
+
+        glTexCoord2f((float) (quadroAtualCoroa+1)/7, 1);
+        glVertex2f(posicaoCoroa.x + tamanhoCoroa.largura, posicaoCoroa.y);
+
+        glTexCoord2f((float) (quadroAtualCoroa)/7, 1);
+        glVertex2f(posicaoCoroa.x, posicaoCoroa.y);
+
+    glEnd();
+}
+
+void definePosicaoCoroa(){
+    Ponto posicaoCoroa;
+    posicaoCoroa.x = (float)(comprimentoMaximoTela*0.20)+4;
+    posicaoCoroa.y = (float)larguraMaximaTela*0.05;
+    Tamanho tamanhoCoroa;
+    tamanhoCoroa.largura = 20;
+    tamanhoCoroa.altura = 20;
+    
+    for(int i=0;i<primeiroJogador.quantidadeSetsGanho;i++){
+        posicaoCoroa.x += tamanhoCoroa.largura;
+        desenhaCoroa(posicaoCoroa, tamanhoCoroa);
+    }
+    posicaoCoroa.x = (float)(comprimentoMaximoTela*0.70)+4;
+    for(int i=0;i<segundoJogador.quantidadeSetsGanho;i++){
+        posicaoCoroa.x += tamanhoCoroa.largura;
+        desenhaCoroa(posicaoCoroa, tamanhoCoroa);
+    }
+
+
+    /*Atualiza coroa em cima das barras que estás prestes a completar um set*/
+    Ponto posicaoBarra = posicaoBarraEsquerda;
+    posicaoBarra.y += tamanhoBarraEsquerda.altura/2 - 4;
+    if(primeiroJogador.pontosSet == quantidadePontosGanharSet-1){
+        desenhaCoroa(posicaoBarra, tamanhoCoroa);
+    }
+    if(segundoJogador.pontosSet == quantidadePontosGanharSet-1){
+        posicaoBarra = posicaoBarraDireita;
+        posicaoBarra.y += tamanhoBarraDireita.altura/2 - 4;
+        desenhaCoroa(posicaoBarra, tamanhoCoroa);
+    }
+    
+    if(verificarGanhadorSetConsecutivos == 1 && primeiroJogador.pontosConsecutivos == 1){
+        desenhaCoroa(posicaoBarra, tamanhoCoroa);
+    }
+    if(verificarGanhadorSetConsecutivos == 1 && segundoJogador.pontosConsecutivos == 1){
+        posicaoBarra = posicaoBarraDireita;
+        posicaoBarra.y += tamanhoBarraDireita.altura/2 - 4;
+        desenhaCoroa(posicaoBarra, tamanhoCoroa);
+    }
+}
+void desenhaCena() {
+    // Limpa a tela (com a cor definida por glClearColor(r,g,b)) para que
+    // possamos desenhar
+    glutBitmapString(GLUT_BITMAP_HELVETICA_18, "text");
+    glClear(GL_COLOR_BUFFER_BIT);
+    glColor3f(0.0f, 0.0f, 0.0f);
+    // Habilita o uso de texturas
+    
+    desenhaBackgroundPreto();
 
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, idYinYang);
@@ -219,58 +435,16 @@ void desenhaCena() {
 
     glEnd();
 
+    definePosicaoCoroa();
+
+    desenhaQuadroAviso();
+
     glDisable(GL_TEXTURE_2D);
     
     desenhaPlacar();
 
     // Diz ao OpenGL para colocar o que desenhamos na tela
     glutSwapBuffers();
-}
-
-void iniciaObjetos(){
-
-    tamanhoBola.largura = 60;
-    tamanhoBola.altura = 60;
-
-    float posicaoVerticalBola = rand()%larguraMaximaTela;
-
-    if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
-        posicaoVerticalBola += tamanhoBola.altura+5;
-    else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
-        printf("%f",(float) tamanhoBola.altura);
-        posicaoVerticalBola = larguraMaximaTela-tamanhoBola.altura-5;
-    }
-
-    tamanhoBarraDireita.largura = 15;
-    tamanhoBarraDireita.altura = 100;
-    posicaoBarraDireita.x = (comprimentoMaximoTela-tamanhoBarraDireita.largura);
-    posicaoBarraDireita.y = (larguraMaximaTela-tamanhoBarraDireita.altura)/2;
-
-    tamanhoBarraEsquerda.largura = 15;
-    tamanhoBarraEsquerda.altura = 100;
-    posicaoBarraEsquerda.x = 0;
-    posicaoBarraEsquerda.y = (larguraMaximaTela-tamanhoBarraEsquerda.altura)/2;
-
-    posicaoBola.x = comprimentoMaximoTela/2;
-    posicaoBola.y = posicaoVerticalBola;
-
-    velocidadeBola.x = 15;
-    velocidadeBola.y = 20;
-
-    velocidadeBarra.y = 60;
-    velocidadeBarra.x = 0;
-    orientacaoVerticalBola = 1;
-    orientacaoHorizontalBola = -1;
-
-    podeColidirDireita = 1;
-    podeColidirEsquerda = 1;
-
-    placar.jogador1 = 0;
-    placar.jogador2 = 0;
-    jogoPausado = 0;
-
-    for(int i=0;i<256;i++)
-        keyboard[i] = 0;
 }
 
 // Inicia algumas variáveis de estado
@@ -289,6 +463,8 @@ void inicializa() {
     idTexturaBarraEsquerda = carregaTextura("barraEsquerda.png");
     idTexturaBarraDireita = carregaTextura("barraDireita.png");
     idYinYang = carregaTextura("yinyang.png");
+    idImagePause = carregaTextura("imagem_pause.png");
+    idTexturaCoroa = carregaTextura("crown.png");
     // define o quadrado
     iniciaObjetos();
 }
@@ -354,36 +530,9 @@ int verificaSePassouVertical(Ponto posicao, Tamanho tamanho){
     return 0;
 }
 
-float novaPosicaoVerticalBola(){
-    float posicaoVerticalBola = rand()%larguraMaximaTela;
-
-    if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
-        posicaoVerticalBola += tamanhoBola.altura+5;
-    else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
-        posicaoVerticalBola = larguraMaximaTela-tamanhoBola.altura-5;
-    }
-    return posicaoVerticalBola;
-}
-
-//recebe como parametro o jogador que venceu a rodada;
-void atualizaVencedor(int numeroJogador){
-    posicaoBola.x = comprimentoMaximoTela/2;
-    posicaoBola.y = novaPosicaoVerticalBola(); 
-    podeColidirDireita = 1;
-    podeColidirEsquerda = 1;
-    if(numeroJogador == 1) placar.jogador1++;
-    else placar.jogador2++;
-}
-
 // Callback do evento timer
 void atualizaCena(int periodo) {
-    quadroAtualExplosaoColisao++;
-
-    if(quadroAtualExplosaoColisao == 49){ 
-        quadroAtualExplosaoColisao = 0;
-        bolaColidiuBarra = 0;
-    }
-
+    
     if(orientacaoHorizontalBola == 1){
         quadroAtualBola++;
         if(quadroAtualBola >= 19){
@@ -404,9 +553,9 @@ void atualizaCena(int periodo) {
         }  
 
         if(posicaoBola.x >= comprimentoMaximoTela){
-            atualizaVencedor(1);
+            atualizaVencedorSet(1);
         } else if(posicaoBola.x <= 0){
-            atualizaVencedor(2);
+            atualizaVencedorSet(2);
         }
 
         posicaoBola.x += orientacaoHorizontalBola*velocidadeBola.x;
@@ -458,6 +607,21 @@ void atualizaCena(int periodo) {
     glutTimerFunc(periodo, atualizaCena, periodo);
 }
 
+void atualizaCoroa(int periodo){
+    quadroAtualCoroa++;
+
+    if(quadroAtualCoroa == 7){ 
+        quadroAtualCoroa = 0;
+    }
+
+    // Pede ao GLUT para redesenhar a tela, assim que possível
+    glutPostRedisplay();
+
+    // Se registra novamente, para que fique sempre sendo chamada (30 FPS)
+    
+    glutTimerFunc(periodo, atualizaCoroa, periodo);
+}
+
 // Rotina principal
 int main(int argc, char **argv) {
     // Configuração inicial da janela do GLUT
@@ -476,6 +640,8 @@ int main(int argc, char **argv) {
     glutPassiveMotionFunc(movimentoMouse);
     // Registra a função "atualiza" para executar daqui a 0 milissegundos
     glutTimerFunc(0, atualizaCena, 33);
+
+    glutTimerFunc(0, atualizaCoroa, 150);   
 
     glutMainLoop();
     return 0;
