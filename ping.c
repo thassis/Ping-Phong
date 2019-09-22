@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 
 typedef struct ponto {
     float x, y;
@@ -20,7 +21,7 @@ typedef struct velocidade {
 } Velocidade;
 
 typedef struct pontuacao{
-    int pontosSet, quantidadeSetsGanho, pontosConsecutivos;
+    int pontosSet, quantidadeSetsGanho, pontosConsecutivos, pontuacaoMaxima;
 } Pontuacao;
 
 Pontuacao primeiroJogador, segundoJogador;
@@ -39,8 +40,8 @@ Ponto posicaoMouse;
 Velocidade velocidadeBola;
 Velocidade velocidadeBarra;
 
-const int comprimentoMaximoTela = 600;
-const int larguraMaximaTela = 300;
+int comprimentoMaximoTela = 600;
+int larguraMaximaTela = 300;
 
 int orientacaoVerticalBola = 1;
 int orientacaoHorizontalBola = -1;
@@ -52,6 +53,7 @@ int keyboard[256];
 
 int jogoPausado = 0;
 int reiniciarJogo = 0;
+int jogoFinalizado = 0;
 
 int quadroAtualBola = 0;
 int quadroAtualCoroa = 0;
@@ -63,6 +65,15 @@ int verificarGanhadorSetConsecutivos = 0;
 int limiteSetsGanharJogo = 3; //números impar
 int quantidadePontosGanharSet = 11;
 
+int reservarTecladoParaNome = 0;
+
+char exibirQuadroAviso = 'n';
+
+struct nomeGanhador {
+    char nome[50];
+    int indexNome;
+} ganhador;
+
 GLuint idTexturaBolaBranca;
 GLuint idTexturaBolaPreta;
 GLuint idTexturaBarraEsquerda;
@@ -70,6 +81,16 @@ GLuint idTexturaBarraDireita;
 GLuint idYinYang;
 GLuint idImagePause;
 GLuint idTexturaCoroa;
+
+FILE *arquivo;
+
+const int salvarNmelhoresRanking = 12;
+
+struct ranking{
+    int *posicoes;
+    char **nomes;
+    int *pontuacoes;
+} ranking;
 
 int checaColisaoComBola(Ponto posicaoObj1, Tamanho tamanhoObj1){
     // Collision x-axis
@@ -98,16 +119,17 @@ GLuint carregaTextura(const char* arquivo) {
 }
 
 void iniciaObjetos(){
-
+    glEnable(GL_BLEND);
+    glColor3d(1.0f, 1.0f, 1.0f);
     tamanhoBola.largura = 60;
     tamanhoBola.altura = 60;
 
-    float posicaoVerticalBola = rand()%larguraMaximaTela;
+    // float posicaoVerticalBola = rand()%larguraMaximaTela;
+    float posicaoVerticalBola = larguraMaximaTela/2;
 
     if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
         posicaoVerticalBola += tamanhoBola.altura+5;
     else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
-        printf("%f",(float) tamanhoBola.altura);
         posicaoVerticalBola = larguraMaximaTela-tamanhoBola.altura-5;
     }
 
@@ -144,7 +166,14 @@ void iniciaObjetos(){
     primeiroJogador.pontosConsecutivos = 0;
     segundoJogador.pontosConsecutivos = 0;
 
+    primeiroJogador.pontuacaoMaxima = 0;
+    segundoJogador.pontuacaoMaxima = 0;
+
+    ganhador.indexNome = 0;
+
     jogoPausado = 0;
+
+    jogoFinalizado = 0;
 
     for(int i=0;i<256;i++)
         keyboard[i] = 0;
@@ -187,18 +216,20 @@ char* retornaPontuacaoString(int pontuacao){
 }
 
 void desenhaPlacar(){
-    char pontuacaoString[2];
-    sprintf(pontuacaoString, "%d", primeiroJogador.pontosSet);
-    glColor3d(1.0, 1.0, 1.0);
-    glRasterPos2d(comprimentoMaximoTela*0.20, (float)larguraMaximaTela*0.1);
-    for (int n=0; n<2; ++n) {
-        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pontuacaoString[n]);
-    }
-    sprintf(pontuacaoString, "%d", segundoJogador.pontosSet);
-    glColor3d(0.0, 0.0, 0.0);
-    glRasterPos2d(comprimentoMaximoTela*0.70, (float)larguraMaximaTela*0.1);
-    for (int n=0; n<2; ++n) {
-        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pontuacaoString[n]);
+    if(jogoFinalizado == 0){
+        char pontuacaoString[2];
+        sprintf(pontuacaoString, "%d", primeiroJogador.pontosSet);
+        glColor3d(1.0, 1.0, 1.0);
+        glRasterPos2d(comprimentoMaximoTela*0.20, (float)larguraMaximaTela*0.1);
+        for (int n=0; n<2; ++n) {
+            glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pontuacaoString[n]);
+        }
+        sprintf(pontuacaoString, "%d", segundoJogador.pontosSet);
+        glColor3d(0.0, 0.0, 0.0);
+        glRasterPos2d(comprimentoMaximoTela*0.70, (float)larguraMaximaTela*0.1);
+        for (int n=0; n<2; ++n) {
+            glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pontuacaoString[n]);
+        }
     }
 }
 
@@ -215,20 +246,160 @@ void desenhaBackgroundPreto(){
         glVertex2f(comprimentoMaximoTela/2, larguraMaximaTela);
 
     glEnd();
+    glColor3d(1.0, 1.0, 1.0);
+    glEnable(GL_PRIMITIVE_RESTART);
+    glBegin(GL_TRIANGLE_STRIP);
+        glVertex2f(comprimentoMaximoTela/2, 0);
+
+        glVertex2f(comprimentoMaximoTela, 0);
+
+        glVertex2f(comprimentoMaximoTela/2, larguraMaximaTela);
+
+        glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
+
+    glEnd();
+}
+
+void desenhaTelaAdicionarNome(){
+
+}
+
+void desenhaRanking(){
+    if(jogoFinalizado == 1){
+        glDisable(GL_BLEND);
+        glEnable(GL_PRIMITIVE_RESTART);
+        glClearColor(0.0, 0.0, 0.0, 0.0);
+        glBegin(GL_TRIANGLE_STRIP);
+            glVertex2f(0, 0);
+
+            glVertex2f(comprimentoMaximoTela, 0);
+
+            glVertex2f(0, larguraMaximaTela);
+
+            glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
+
+        glEnd();
+        glColor3d(0.0, 0.0, 0.0);
+        glRasterPos2d(0, (float)larguraMaximaTela*0.2);
+        char titulo[] = "Ranking dos melhores";
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, titulo);
+        int aux = (float)larguraMaximaTela*0.2;
+        for(int i=0;i<salvarNmelhoresRanking;i++){
+            aux += 10;
+            glRasterPos2d(0, aux);
+            char strPontuacao[50];
+            char strPosicao[50];
+            char strRanking[200];
+            sprintf(strPosicao, "%d", ranking.posicoes[i]);
+            sprintf(strPontuacao, "%d", ranking.pontuacoes[i]);
+
+            strcat(strPosicao, " ");
+            strcpy(strRanking, strPosicao);
+            strcat(strRanking, ranking.nomes[i]);
+            strcat(strRanking, " ");
+            strcat(strRanking, strPontuacao);
+
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, strRanking);
+        }
+    }
+}
+
+void desenhaTexturaAviso(GLuint idTextura){
+    glColor3d(0.50f, 0.50f, 0.50f);
+    glBegin(GL_TRIANGLE_STRIP);
+        glVertex2f(0, 0);
+
+        glVertex2f(comprimentoMaximoTela, 0);
+
+        glVertex2f(0, larguraMaximaTela);
+
+        glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
+
+    glEnd();
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, idTextura);
+    glEnable(GL_PRIMITIVE_RESTART);
+    glBegin(GL_POLYGON);
+        // Associamos um canto da textura para cada vértice
+        glTexCoord2f(0, 0);
+        glVertex2f(0, 0);
+
+        glTexCoord2f(1, 0);
+        glVertex2f(comprimentoMaximoTela, 0);
+
+        glTexCoord2f(1, 1);
+        glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
+
+        glTexCoord2f(0, 1);
+        glVertex2f(0, larguraMaximaTela);
+
+    glEnd();
+}
+
+/*
+    Opcao da tela a ser desenhada;
+    opcao == 'p' => tela de pause
+    opcao == 'r' => tela de reiniciar
+    opcao == 'v' => tela de vencedor
+    opcao == 'w' => tela de digitar o ranking
+    opcao == 'b' => tela de exibir o Ranking de todos
+    opcao == default => nao exibir
+*/
+void desenhaQuadroAviso(char opcao){
+    
+    switch (opcao){
+        case 'w':
+            jogoFinalizado = 1;
+            reservarTecladoParaNome = 1;
+            desenhaTexturaAviso(idImagePause);
+            break;
+        case 'v':
+            jogoFinalizado = 1;
+            // iniciaObjetos();
+            desenhaTexturaAviso(idImagePause);
+            break;
+        case 'b':
+            desenhaRanking();
+            break;
+        default:
+            break;
+    }
+    
+}
+
+void verificaRanking(int pontuacao){
+    printf("pontuacao %d - %d \n", pontuacao, ranking.pontuacoes[salvarNmelhoresRanking-1]);
+    int menorRanking = ranking.pontuacoes[salvarNmelhoresRanking-1];
+    if(pontuacao >= menorRanking){
+        printf("entrou ak");
+        ranking.pontuacoes[salvarNmelhoresRanking-1] = pontuacao;
+        exibirQuadroAviso = 'w';
+        jogoFinalizado = 1;
+        printf("escrever no arquivo");
+        desenhaQuadroAviso('w');
+    } else {
+        jogoFinalizado = 1;
+        desenhaQuadroAviso('v');
+    }
 }
 
 void verificaGanhadorGame(){
     if(primeiroJogador.quantidadeSetsGanho == limiteSetsGanharJogo){
         //ganhou
-        iniciaObjetos();
+        verificaRanking(primeiroJogador.pontuacaoMaxima);
     } else if(segundoJogador.quantidadeSetsGanho == limiteSetsGanharJogo){
         //ganhou
-        iniciaObjetos();
+        verificaRanking(segundoJogador.pontuacaoMaxima);
     }
 }
 
 void atualizaSet(){
     verificarGanhadorSetConsecutivos = 0;
+    if(primeiroJogador.pontuacaoMaxima < primeiroJogador.pontosSet) 
+        primeiroJogador.pontuacaoMaxima = primeiroJogador.pontosSet;
+    else if(segundoJogador.pontuacaoMaxima < segundoJogador.pontosSet) 
+        segundoJogador.pontuacaoMaxima = segundoJogador.pontosSet;
     primeiroJogador.pontosSet = 0;
     primeiroJogador.pontosConsecutivos = 0;
     segundoJogador.pontosSet = 0;
@@ -237,8 +408,8 @@ void atualizaSet(){
 }
 
 float novaPosicaoVerticalBola(){
-    float posicaoVerticalBola = rand()%larguraMaximaTela;
-
+    // float posicaoVerticalBola = rand()%larguraMaximaTela;
+    float posicaoVerticalBola = larguraMaximaTela/2;
     if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
         posicaoVerticalBola += tamanhoBola.altura+5;
     else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
@@ -290,20 +461,32 @@ void atualizaVencedorSet(int numeroJogador){
     verificaGanhadorSet();
 }
 
-void desenhaQuadroAviso(){
-    if(jogoPausado){
-        glColor3d(0.50f, 0.50f, 0.50f);
-        glBegin(GL_TRIANGLE_STRIP);
-            glVertex2f(0, 0);
+void salvaNovoRecorde(){
+    printf("salvou no arquivo %s", ganhador.nome);
+    ranking.nomes[salvarNmelhoresRanking-1][0] = '\0';
+    strcpy(ranking.nomes[salvarNmelhoresRanking-1], ganhador.nome);
+    int i, j, auxPontuacao;
+    char auxNome[50];
+    for(i = 1; i < salvarNmelhoresRanking; i++) {
+       for (j = 0; j < salvarNmelhoresRanking - 1; j++) {
+            if (ranking.pontuacoes[j] < ranking.pontuacoes[j + 1]) {
+                auxPontuacao = ranking.pontuacoes[j];
+                ranking.pontuacoes[j] = ranking.pontuacoes[j + 1];
+                ranking.pontuacoes[j + 1] = auxPontuacao;
 
-            glVertex2f(comprimentoMaximoTela, 0);
-
-            glVertex2f(0, larguraMaximaTela);
-
-            glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
-
-        glEnd();
+                strcpy(auxNome, ranking.nomes[j]);
+                strcpy(ranking.nomes[j], ranking.nomes[j + 1]);
+                strcpy(ranking.nomes[j + 1], auxNome);
+            }
+        }
     }
+    fclose(arquivo);
+    arquivo = fopen("ranking.txt", "w+");
+    for(int i=0;i<salvarNmelhoresRanking;i++){
+        fprintf(arquivo, "%d;%s;%d;\n", ranking.posicoes[i], ranking.nomes[i], ranking.pontuacoes[i]);
+    }
+    fclose(arquivo);
+    exibirQuadroAviso = 'b';
 }
 
 void desenhaCoroa(Ponto posicaoCoroa, Tamanho tamanhoCoroa){
@@ -371,8 +554,9 @@ void desenhaCena() {
     // Limpa a tela (com a cor definida por glClearColor(r,g,b)) para que
     // possamos desenhar
     glutBitmapString(GLUT_BITMAP_HELVETICA_18, "text");
+    glEnable(GL_PRIMITIVE_RESTART);
     glClear(GL_COLOR_BUFFER_BIT);
-    glColor3f(0.0f, 0.0f, 0.0f);
+    glColor3f(1.0f, 1.0f, 1.0f);
     // Habilita o uso de texturas
     
     desenhaBackgroundPreto();
@@ -437,7 +621,7 @@ void desenhaCena() {
 
     definePosicaoCoroa();
 
-    desenhaQuadroAviso();
+    desenhaQuadroAviso(exibirQuadroAviso);
 
     glDisable(GL_TEXTURE_2D);
     
@@ -471,6 +655,8 @@ void inicializa() {
 
 // Callback de redimensionamento
 void redimensiona(int w, int h) {
+    comprimentoMaximoTela = w;
+    larguraMaximaTela = h;
     glViewport(0, 0, w, h);
 
     glMatrixMode(GL_PROJECTION);
@@ -487,25 +673,39 @@ void redimensiona(int w, int h) {
 // Callback de evento de teclado
 void teclaPressionada(unsigned char key, int x, int y) {
     keyboard[key] = 1;
-    switch(key) {
-        // Tecla ESC
-        case 27:
-            exit(0);
-            break;
-        case 'p':
-            if(jogoPausado == 1) {
-                jogoPausado = 0;
-            } else {
-                jogoPausado = 1;
-            }
-            glutPostRedisplay();
-            break;
-        case 'r':
-            iniciaObjetos();
-            break;
-        default:
-            break;
+    if(reservarTecladoParaNome == 0)
+        switch(key) {
+            // Tecla ESC
+            case 27:
+                exit(0);
+                fclose(arquivo);
+                break;
+            case 'p':
+                if(jogoPausado == 1) {
+                    jogoPausado = 0;
+                } else {
+                    jogoPausado = 1;
+                }
+                glutPostRedisplay();
+                break;
+            case 'r':
+                iniciaObjetos();
+                break;
+            default:
+                break;
+        }
+    else{
+        printf("caracter %c\n", key);
+        if(key != 13){
+            ganhador.nome[ganhador.indexNome] = key;
+            ganhador.indexNome++;
+        } else {
+            reservarTecladoParaNome = 0;
+            salvaNovoRecorde();
+        }
     }
+    
+    
     // posicaoBarraDireita.y +=5; 
 }
 
@@ -547,7 +747,7 @@ void atualizaCena(int periodo) {
     
 
     // faz o quadrado andar na direção do ponteiro
-    if(jogoPausado == 0){
+    if(jogoPausado == 0 && jogoFinalizado == 0){
         if(verificaSePassouVertical(posicaoBola, tamanhoBola) == 1){
             orientacaoVerticalBola *= -1;
         }  
@@ -622,9 +822,83 @@ void atualizaCoroa(int periodo){
     glutTimerFunc(periodo, atualizaCoroa, periodo);
 }
 
+void leRanking(){
+    ranking.pontuacoes = (int*)malloc(salvarNmelhoresRanking*sizeof(int));
+    ranking.posicoes = (int*)malloc(salvarNmelhoresRanking*sizeof(int));
+    ranking.nomes = (char**)malloc(salvarNmelhoresRanking * sizeof(char*));
+    for(int i = 0; i < salvarNmelhoresRanking; i++){
+        ranking.nomes[i] = (char *)malloc(50 * sizeof(char));
+        ranking.nomes[i][0] = 'x';
+        ranking.posicoes[i] = i+1;
+        ranking.pontuacoes[i] = 0;
+    }
+
+    char carecterArquivo;
+    char strPosicao[1];
+    char strNome[50];
+    char strPontuacao[50];
+    int aux = 0;
+    int posicaoPontoVirgula = 0;
+    int linha = 0;
+    arquivo = fopen("ranking.txt", "r");
+    /*
+        lê os caracteres e os separa a cada ;, para salvar nas variáveis
+        1 coluna (posicaoPontoVirgula == 0) significa que estou lendo as posicoes;
+        2 coluna (posicaoPontoVirgula == 1) significa que estou lendo os nomes;
+        3 coluna (posicaoPontoVirgula == 2) significa que estou lendo as pontuacoes;
+    */
+    while (carecterArquivo != EOF){
+        //faz a leitura do caracter no arquivo apontado por pont_arq
+        carecterArquivo = getc(arquivo);
+        if(carecterArquivo!=';'){
+            if(carecterArquivo != '\n' && carecterArquivo != EOF){
+                if (posicaoPontoVirgula == 0)
+                    strPosicao[aux] = carecterArquivo;
+                else if(posicaoPontoVirgula == 1)
+                    strNome[aux] = carecterArquivo;
+                else if(posicaoPontoVirgula == 2)
+                    strPontuacao[aux] = carecterArquivo;
+                // printf("%c  ---- %d\n", carecterArquivo, aux);
+                aux++;
+            }
+            // printf("%s %s %s", strPontuacao, strNome, strPosicao);
+        }else{
+            switch (posicaoPontoVirgula){
+                case 0:
+                    sscanf(strPosicao, "%d", &ranking.posicoes[linha]);
+                    memset(strPosicao,0,sizeof(strPosicao));
+                    break;
+                case 1:
+                    strcpy(ranking.nomes[linha], strNome);
+                    ranking.nomes[linha][aux] = '\0';
+                    memset(strNome,0,sizeof(strNome));
+                    break;
+                case 2:
+                    sscanf(strPontuacao, "%d", &ranking.pontuacoes[linha]);
+                    memset(strPontuacao,0,sizeof(strPontuacao));
+                    break;
+                default:
+                    break;
+            }
+            aux=0;
+            posicaoPontoVirgula++;
+            if(posicaoPontoVirgula==3) {
+                posicaoPontoVirgula = 0; // reiniciou a linha
+                linha++;
+            }
+        }
+        //exibe o caracter lido na tela
+    }
+    for(int i=0;i<salvarNmelhoresRanking;i++){
+        printf("%d - %s - %d \n", ranking.posicoes[i], ranking.nomes[i] ,ranking.pontuacoes[i]);
+    }
+}
+
 // Rotina principal
 int main(int argc, char **argv) {
     // Configuração inicial da janela do GLUT
+    //abrindo o arquivo
+    leRanking();
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
     glutInitWindowSize(comprimentoMaximoTela, larguraMaximaTela);
