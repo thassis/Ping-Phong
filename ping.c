@@ -57,12 +57,12 @@ int jogoFinalizado = 0;
 
 int quadroAtualBola = 0;
 int quadroAtualCoroa = 0;
-
+int quadroAtualSegundos = 0;
 int bolaColidiuBarra = 0;
 
 int verificarGanhadorSetConsecutivos = 0;
 
-int limiteSetsGanharJogo = 3; //números impar
+int limiteSetsGanharJogo = 3 ; //números impar
 int quantidadePontosGanharSet = 11;
 
 int reservarTecladoParaNome = 0;
@@ -72,6 +72,7 @@ char exibirQuadroAviso = 'n';
 struct nomeGanhador {
     char nome[50];
     int indexNome;
+    int numeroVencedor;
 } ganhador;
 
 GLuint idTexturaBolaBranca;
@@ -81,6 +82,10 @@ GLuint idTexturaBarraDireita;
 GLuint idYinYang;
 GLuint idImagePause;
 GLuint idTexturaCoroa;
+GLuint idTexturaVencedor1;
+GLuint idTexturaVencedor2;
+GLuint idTexturaRecorde;
+GLuint idTexturaReiniciar;
 
 FILE *arquivo;
 
@@ -121,11 +126,12 @@ GLuint carregaTextura(const char* arquivo) {
 void iniciaObjetos(){
     glEnable(GL_BLEND);
     glColor3d(1.0f, 1.0f, 1.0f);
+    exibirQuadroAviso = 'n';
+    reiniciarJogo = 0;
     tamanhoBola.largura = 60;
     tamanhoBola.altura = 60;
 
-    // float posicaoVerticalBola = rand()%larguraMaximaTela;
-    float posicaoVerticalBola = larguraMaximaTela/2;
+    float posicaoVerticalBola = rand()%larguraMaximaTela;
 
     if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
         posicaoVerticalBola += tamanhoBola.altura+5;
@@ -134,12 +140,12 @@ void iniciaObjetos(){
     }
 
     tamanhoBarraDireita.largura = 15;
-    tamanhoBarraDireita.altura = 40;
+    tamanhoBarraDireita.altura = 80;
     posicaoBarraDireita.x = (comprimentoMaximoTela-tamanhoBarraDireita.largura);
     posicaoBarraDireita.y = (larguraMaximaTela-tamanhoBarraDireita.altura)/2;
 
     tamanhoBarraEsquerda.largura = 15;
-    tamanhoBarraEsquerda.altura = 40;
+    tamanhoBarraEsquerda.altura = 80;
     posicaoBarraEsquerda.x = 0;
     posicaoBarraEsquerda.y = (larguraMaximaTela-tamanhoBarraEsquerda.altura)/2;
 
@@ -170,11 +176,12 @@ void iniciaObjetos(){
     segundoJogador.pontuacaoMaxima = 0;
 
     ganhador.indexNome = 0;
-
+    ganhador.numeroVencedor = 0;
     jogoPausado = 0;
 
     jogoFinalizado = 0;
 
+    quadroAtualSegundos = 0;
     for(int i=0;i<256;i++)
         keyboard[i] = 0;
 }
@@ -231,6 +238,7 @@ void desenhaPlacar(){
             glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, pontuacaoString[n]);
         }
     }
+    glClearColor(1.0f,1.0f,1.0f,1.0f);
 }
 
 
@@ -265,27 +273,33 @@ void desenhaTelaAdicionarNome(){
 }
 
 void desenhaRanking(){
-    if(jogoFinalizado == 1){
-        glDisable(GL_BLEND);
+    if(jogoFinalizado == 1 && exibirQuadroAviso == 'b'){
+        // glDisable(GL_BLEND);
+        // printf("aqui %c\n", exibirQuadroAviso);
+        glClearColor(1.0f,1.0f,1.0f,1.0f);
         glEnable(GL_PRIMITIVE_RESTART);
-        glClearColor(0.0, 0.0, 0.0, 0.0);
-        glBegin(GL_TRIANGLE_STRIP);
-            glVertex2f(0, 0);
-
-            glVertex2f(comprimentoMaximoTela, 0);
-
+        glBegin(GL_POLYGON);
+            // Associamos um canto da textura para cada vértice
+            
             glVertex2f(0, larguraMaximaTela);
 
             glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
 
+            glVertex2f(comprimentoMaximoTela, 0);
+
+            glVertex2f(0, 0);
+
         glEnd();
         glColor3d(0.0, 0.0, 0.0);
-        glRasterPos2d(0, (float)larguraMaximaTela*0.2);
+        glRasterPos2d(0, (float)larguraMaximaTela*0.1);
         char titulo[] = "Ranking dos melhores";
         glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, titulo);
+        glRasterPos2d(0, (float)larguraMaximaTela*0.2);
+        char subtitulo[] = "Posicao Nome Pontuacao";
+        glutBitmapString(GLUT_BITMAP_HELVETICA_18, subtitulo);
         int aux = (float)larguraMaximaTela*0.2;
         for(int i=0;i<salvarNmelhoresRanking;i++){
-            aux += 10;
+            aux += 18;
             glRasterPos2d(0, aux);
             char strPontuacao[50];
             char strPosicao[50];
@@ -299,42 +313,45 @@ void desenhaRanking(){
             strcat(strRanking, " ");
             strcat(strRanking, strPontuacao);
 
-            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, strRanking);
+            glutBitmapString(GLUT_BITMAP_HELVETICA_18, strRanking);
         }
     }
 }
 
 void desenhaTexturaAviso(GLuint idTextura){
-    glColor3d(0.50f, 0.50f, 0.50f);
-    glBegin(GL_TRIANGLE_STRIP);
-        glVertex2f(0, 0);
-
-        glVertex2f(comprimentoMaximoTela, 0);
-
-        glVertex2f(0, larguraMaximaTela);
-
-        glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
-
-    glEnd();
-
+    if(exibirQuadroAviso == 'w' || exibirQuadroAviso == 'p' || exibirQuadroAviso == 'r' || exibirQuadroAviso == 'v')
+    jogoPausado = 1;
+    glColor3d(1.0f, 1.0f, 1.0f);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, idTextura);
     glEnable(GL_PRIMITIVE_RESTART);
     glBegin(GL_POLYGON);
         // Associamos um canto da textura para cada vértice
         glTexCoord2f(0, 0);
-        glVertex2f(0, 0);
-
-        glTexCoord2f(1, 0);
-        glVertex2f(comprimentoMaximoTela, 0);
-
-        glTexCoord2f(1, 1);
-        glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
-
-        glTexCoord2f(0, 1);
         glVertex2f(0, larguraMaximaTela);
 
+        glTexCoord2f(1, 0);
+        glVertex2f(comprimentoMaximoTela, larguraMaximaTela);
+
+        glTexCoord2f(1, 1);
+        glVertex2f(comprimentoMaximoTela, 0);
+
+        glTexCoord2f(0, 1);
+        glVertex2f(0, 0);
+
     glEnd();
+    glClearColor(1.0f,1.0f,1.0f,1.0f);
+}
+
+void reiniciarTela(){
+    jogoPausado = 1;
+    if(keyboard['s'] == 1){
+        iniciaObjetos();
+    } else if(keyboard['n'] == 1){
+        reiniciarJogo = 0;
+        jogoPausado = 0;
+        exibirQuadroAviso = 'n';
+    }
 }
 
 /*
@@ -352,34 +369,42 @@ void desenhaQuadroAviso(char opcao){
         case 'w':
             jogoFinalizado = 1;
             reservarTecladoParaNome = 1;
-            desenhaTexturaAviso(idImagePause);
+            desenhaTexturaAviso(idTexturaRecorde);
             break;
         case 'v':
             jogoFinalizado = 1;
             // iniciaObjetos();
-            desenhaTexturaAviso(idImagePause);
+            if(ganhador.numeroVencedor == 1)
+                desenhaTexturaAviso(idTexturaVencedor1);
+            else 
+                desenhaTexturaAviso(idTexturaVencedor2);
             break;
         case 'b':
             desenhaRanking();
             break;
+        case 'r':
+            desenhaTexturaAviso(idTexturaReiniciar);
+            reiniciarTela();
+            break;
+        case 'p':
+            desenhaTexturaAviso(idImagePause);
+            break;
         default:
             break;
-    }
-    
+    }   
+    glClearColor(1.0f,1.0f,1.0f,1.0f);
 }
 
 void verificaRanking(int pontuacao){
-    printf("pontuacao %d - %d \n", pontuacao, ranking.pontuacoes[salvarNmelhoresRanking-1]);
     int menorRanking = ranking.pontuacoes[salvarNmelhoresRanking-1];
     if(pontuacao >= menorRanking){
-        printf("entrou ak");
         ranking.pontuacoes[salvarNmelhoresRanking-1] = pontuacao;
         exibirQuadroAviso = 'w';
         jogoFinalizado = 1;
-        printf("escrever no arquivo");
         desenhaQuadroAviso('w');
     } else {
         jogoFinalizado = 1;
+        exibirQuadroAviso = 'v';
         desenhaQuadroAviso('v');
     }
 }
@@ -387,9 +412,11 @@ void verificaRanking(int pontuacao){
 void verificaGanhadorGame(){
     if(primeiroJogador.quantidadeSetsGanho == limiteSetsGanharJogo){
         //ganhou
+        ganhador.numeroVencedor = 1;
         verificaRanking(primeiroJogador.pontuacaoMaxima);
     } else if(segundoJogador.quantidadeSetsGanho == limiteSetsGanharJogo){
         //ganhou
+        ganhador.numeroVencedor = 2;
         verificaRanking(segundoJogador.pontuacaoMaxima);
     }
 }
@@ -408,8 +435,8 @@ void atualizaSet(){
 }
 
 float novaPosicaoVerticalBola(){
-    // float posicaoVerticalBola = rand()%larguraMaximaTela;
-    float posicaoVerticalBola = larguraMaximaTela/2;
+    float posicaoVerticalBola = rand()%larguraMaximaTela;
+
     if(posicaoVerticalBola >= 0 && posicaoVerticalBola <= tamanhoBola.altura)
         posicaoVerticalBola += tamanhoBola.altura+5;
     else if(posicaoVerticalBola <= larguraMaximaTela && posicaoVerticalBola >= larguraMaximaTela - tamanhoBola.altura){
@@ -462,7 +489,6 @@ void atualizaVencedorSet(int numeroJogador){
 }
 
 void salvaNovoRecorde(){
-    printf("salvou no arquivo %s", ganhador.nome);
     ranking.nomes[salvarNmelhoresRanking-1][0] = '\0';
     strcpy(ranking.nomes[salvarNmelhoresRanking-1], ganhador.nome);
     int i, j, auxPontuacao;
@@ -559,69 +585,73 @@ void desenhaCena() {
     glColor3f(1.0f, 1.0f, 1.0f);
     // Habilita o uso de texturas
     
-    desenhaBackgroundPreto();
+    if(exibirQuadroAviso != 'b'){
+        desenhaBackgroundPreto();
 
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, idYinYang);
-    glColor3f(1.0f, 1.0f, 1.0f);
-    glEnable(GL_PRIMITIVE_RESTART);
-    glBegin(GL_POLYGON);
-        // Associamos um canto da textura para cada vértice
-        glTexCoord2f(0, 0);
-        glVertex2f((comprimentoMaximoTela/2) - 0.10*comprimentoMaximoTela, (comprimentoMaximoTela/4) - 0.10*comprimentoMaximoTela);
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, idYinYang);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glEnable(GL_PRIMITIVE_RESTART);
+        glBegin(GL_POLYGON);
+            // Associamos um canto da textura para cada vértice
+            glTexCoord2f(0, 0);
+            glVertex2f((comprimentoMaximoTela/2) - 0.10*comprimentoMaximoTela, (larguraMaximaTela/2) - 0.10*comprimentoMaximoTela);
 
-        glTexCoord2f(1, 0);
-        glVertex2f((comprimentoMaximoTela/2) + 0.10*comprimentoMaximoTela, (comprimentoMaximoTela/4) - 0.10*comprimentoMaximoTela);
+            glTexCoord2f(1, 0);
+            glVertex2f((comprimentoMaximoTela/2) + 0.10*comprimentoMaximoTela, (larguraMaximaTela/2) - 0.10*comprimentoMaximoTela);
 
-        glTexCoord2f(1, 1);
-        glVertex2f((comprimentoMaximoTela/2) + 0.10*comprimentoMaximoTela, (comprimentoMaximoTela/4) + 0.10*comprimentoMaximoTela);
+            glTexCoord2f(1, 1);
+            glVertex2f((comprimentoMaximoTela/2) + 0.10*comprimentoMaximoTela, (larguraMaximaTela/2) + 0.10*comprimentoMaximoTela);
 
-        glTexCoord2f(0, 1);
-        glVertex2f((comprimentoMaximoTela/2) - 0.10*comprimentoMaximoTela, (comprimentoMaximoTela/4) + 0.10*comprimentoMaximoTela);
+            glTexCoord2f(0, 1);
+            glVertex2f((comprimentoMaximoTela/2) - 0.10*comprimentoMaximoTela, (larguraMaximaTela/2) + 0.10*comprimentoMaximoTela);
 
-    glEnd();
+        glEnd();
 
-    desenhaBola();
-    // Começa a usar a textura que criamos
-    glBindTexture(GL_TEXTURE_2D, idTexturaBarraDireita);
-    glEnable(GL_PRIMITIVE_RESTART);
-    glBegin(GL_POLYGON);
-        // Associamos um canto da textura para cada vértice
-        glTexCoord2f(0, 0);
-        glVertex2f(posicaoBarraDireita.x, posicaoBarraDireita.y);
+        desenhaBola();
+        // Começa a usar a textura que criamos
+        glBindTexture(GL_TEXTURE_2D, idTexturaBarraDireita);
+        glEnable(GL_PRIMITIVE_RESTART);
+        glBegin(GL_POLYGON);
+            // Associamos um canto da textura para cada vértice
+            glTexCoord2f(0, 0);
+            glVertex2f(posicaoBarraDireita.x, posicaoBarraDireita.y);
 
-        glTexCoord2f(1, 0);
-        glVertex2f( posicaoBarraDireita.x + tamanhoBarraDireita.largura, posicaoBarraDireita.y);
+            glTexCoord2f(1, 0);
+            glVertex2f( posicaoBarraDireita.x + tamanhoBarraDireita.largura, posicaoBarraDireita.y);
 
-        glTexCoord2f(1, 1);
-        glVertex2f( posicaoBarraDireita.x + tamanhoBarraDireita.largura, posicaoBarraDireita.y + tamanhoBarraDireita.altura);
+            glTexCoord2f(1, 1);
+            glVertex2f( posicaoBarraDireita.x + tamanhoBarraDireita.largura, posicaoBarraDireita.y + tamanhoBarraDireita.altura);
 
-        glTexCoord2f(0, 1);
-        glVertex2f(posicaoBarraDireita.x, posicaoBarraDireita.y + tamanhoBarraDireita.altura);
+            glTexCoord2f(0, 1);
+            glVertex2f(posicaoBarraDireita.x, posicaoBarraDireita.y + tamanhoBarraDireita.altura);
 
-    glEnd();
+        glEnd();
 
-    glBindTexture(GL_TEXTURE_2D, idTexturaBarraEsquerda);    
-    glEnable(GL_PRIMITIVE_RESTART);
-    glBegin(GL_POLYGON);
-        // Associamos um canto da textura para cada vértice
-        glTexCoord2f(0, 0);
-        glVertex2f(posicaoBarraEsquerda.x, posicaoBarraEsquerda.y);
+        glBindTexture(GL_TEXTURE_2D, idTexturaBarraEsquerda);    
+        glEnable(GL_PRIMITIVE_RESTART);
+        glBegin(GL_POLYGON);
+            // Associamos um canto da textura para cada vértice
+            glTexCoord2f(0, 0);
+            glVertex2f(posicaoBarraEsquerda.x, posicaoBarraEsquerda.y);
 
-        glTexCoord2f(1, 0);
-        glVertex2f( posicaoBarraEsquerda.x + tamanhoBarraEsquerda.largura, posicaoBarraEsquerda.y);
+            glTexCoord2f(1, 0);
+            glVertex2f( posicaoBarraEsquerda.x + tamanhoBarraEsquerda.largura, posicaoBarraEsquerda.y);
 
-        glTexCoord2f(1, 1);
-        glVertex2f( posicaoBarraEsquerda.x + tamanhoBarraEsquerda.largura, posicaoBarraEsquerda.y + tamanhoBarraEsquerda.altura);
+            glTexCoord2f(1, 1);
+            glVertex2f( posicaoBarraEsquerda.x + tamanhoBarraEsquerda.largura, posicaoBarraEsquerda.y + tamanhoBarraEsquerda.altura);
 
-        glTexCoord2f(0, 1);
-        glVertex2f(posicaoBarraEsquerda.x, posicaoBarraEsquerda.y + tamanhoBarraEsquerda.altura);
+            glTexCoord2f(0, 1);
+            glVertex2f(posicaoBarraEsquerda.x, posicaoBarraEsquerda.y + tamanhoBarraEsquerda.altura);
 
-    glEnd();
+        glEnd();
 
-    definePosicaoCoroa();
+        definePosicaoCoroa();
 
-    desenhaQuadroAviso(exibirQuadroAviso);
+        desenhaQuadroAviso(exibirQuadroAviso);
+    } else {
+        desenhaRanking();
+    }
 
     glDisable(GL_TEXTURE_2D);
     
@@ -639,7 +669,7 @@ void inicializa() {
     
     // habilita mesclagem de cores, para termos suporte a texturas
     // com transparência
-    glEnable(GL_BLEND );
+    glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     idTexturaBolaBranca = carregaTextura("bola_branca.png");
@@ -647,8 +677,12 @@ void inicializa() {
     idTexturaBarraEsquerda = carregaTextura("barraEsquerda.png");
     idTexturaBarraDireita = carregaTextura("barraDireita.png");
     idYinYang = carregaTextura("yinyang.png");
-    idImagePause = carregaTextura("imagem_pause.png");
+    idImagePause = carregaTextura("pausado.png");
     idTexturaCoroa = carregaTextura("crown.png");
+    idTexturaVencedor1 = carregaTextura("vencedor1.png");
+    idTexturaVencedor2 = carregaTextura("vencedor2.png");
+    idTexturaRecorde = carregaTextura("recorde.png");
+    idTexturaReiniciar = carregaTextura("reiniciar.png");
     // define o quadrado
     iniciaObjetos();
 }
@@ -658,6 +692,9 @@ void redimensiona(int w, int h) {
     comprimentoMaximoTela = w;
     larguraMaximaTela = h;
     glViewport(0, 0, w, h);
+    
+    posicaoBarraDireita.x = (comprimentoMaximoTela-tamanhoBarraDireita.largura);
+    posicaoBarraDireita.y = (larguraMaximaTela-tamanhoBarraDireita.altura)/2;
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -682,22 +719,28 @@ void teclaPressionada(unsigned char key, int x, int y) {
                 break;
             case 'p':
                 if(jogoPausado == 1) {
+                    exibirQuadroAviso = 'n';
                     jogoPausado = 0;
                 } else {
+                    exibirQuadroAviso = 'p';
                     jogoPausado = 1;
                 }
                 glutPostRedisplay();
                 break;
             case 'r':
-                iniciaObjetos();
+                exibirQuadroAviso = 'r';
                 break;
             default:
                 break;
         }
     else{
-        printf("caracter %c\n", key);
         if(key != 13){
             ganhador.nome[ganhador.indexNome] = key;
+            glClearColor(0.0f,0.0f,0.0f,0.0f);
+            glDisable(GL_BLEND);
+            glEnable(GL_PRIMITIVE_RESTART);
+            glRasterPos2d(24+ganhador.indexNome, (float)larguraMaximaTela*0.8);
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, ganhador.nome);
             ganhador.indexNome++;
         } else {
             reservarTecladoParaNome = 0;
@@ -858,10 +901,8 @@ void leRanking(){
                     strNome[aux] = carecterArquivo;
                 else if(posicaoPontoVirgula == 2)
                     strPontuacao[aux] = carecterArquivo;
-                // printf("%c  ---- %d\n", carecterArquivo, aux);
                 aux++;
             }
-            // printf("%s %s %s", strPontuacao, strNome, strPosicao);
         }else{
             switch (posicaoPontoVirgula){
                 case 0:
@@ -889,9 +930,6 @@ void leRanking(){
         }
         //exibe o caracter lido na tela
     }
-    for(int i=0;i<salvarNmelhoresRanking;i++){
-        printf("%d - %s - %d \n", ranking.posicoes[i], ranking.nomes[i] ,ranking.pontuacoes[i]);
-    }
 }
 
 // Rotina principal
@@ -913,7 +951,7 @@ int main(int argc, char **argv) {
     // Registra a função "movimentoMouse" para executar sempre que o mouse mexer
     glutPassiveMotionFunc(movimentoMouse);
     // Registra a função "atualiza" para executar daqui a 0 milissegundos
-    glutTimerFunc(0, atualizaCena, 33);
+    glutTimerFunc(0, atualizaCena, 40);
 
     glutTimerFunc(0, atualizaCoroa, 150);   
 
