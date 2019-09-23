@@ -63,7 +63,7 @@ int bolaColidiuBarra = 0;
 int verificarGanhadorSetConsecutivos = 0;
 
 int limiteSetsGanharJogo = 3 ; //números impar
-int quantidadePontosGanharSet = 11;
+int quantidadePontosGanharSet = 2;
 
 int reservarTecladoParaNome = 0;
 
@@ -693,6 +693,9 @@ void redimensiona(int w, int h) {
     larguraMaximaTela = h;
     glViewport(0, 0, w, h);
     
+    posicaoBarraEsquerda.x = 0;
+    posicaoBarraEsquerda.y = (larguraMaximaTela-tamanhoBarraEsquerda.altura)/2;
+
     posicaoBarraDireita.x = (comprimentoMaximoTela-tamanhoBarraDireita.largura);
     posicaoBarraDireita.y = (larguraMaximaTela-tamanhoBarraDireita.altura)/2;
 
